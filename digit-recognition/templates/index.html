@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digit Recognition</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        p { color: #666; margin-bottom: 20px; }
+        canvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        .buttons { margin-top: 20px; }
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #predictBtn { background: #4CAF50; color: white; }
+        #predictBtn:hover { background: #45a049; }
+        #clearBtn { background: #f44336; color: white; }
+        #clearBtn:hover { background: #da190b; }
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            background: #e8f5e9;
+            border-radius: 10px;
+            display: none;
+        }
+        .digit { font-size: 60px; font-weight: bold; color: #2e7d32; }
+        .confidence { font-size: 18px; color: #555; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Digit Recognition</h1>
+        <p>Draw a digit (0-9) below</p>
+        
+        <canvas id="canvas" width="280" height="280"></canvas>
+        
+        <div class="buttons">
+            <button id="predictBtn">Predict</button>
+            <button id="clearBtn">Clear</button>
+        </div>
+        
+        <div class="result" id="result">
+            <div class="digit" id="digit">-</div>
+            <div class="confidence" id="confidence"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        // Setup canvas
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, 280, 280);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 15;
+        ctx.lineCap = 'round';
+
+        // Get position
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            return { x: x * 280 / rect.width, y: y * 280 / rect.height };
+        }
+
+        function start(e) {
+            e.preventDefault();
+            drawing = true;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function stop() { drawing = false; }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', start);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stop);
+        canvas.addEventListener('mouseout', stop);
+        
+        // Touch events
+        canvas.addEventListener('touchstart', start);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stop);
+
+        // Clear
+        document.getElementById('clearBtn').onclick = function() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, 280, 280);
+            document.getElementById('result').style.display = 'none';
+        };
+
+        // Predict
+        document.getElementById('predictBtn').onclick = async function() {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: canvas.toDataURL() })
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('digit').textContent = data.digit;
+                document.getElementById('confidence').textContent = 
+                    'Confidence: ' + (data.confidence * 100).toFixed(1) + '%';
+                document.getElementById('result').style.display = 'block';
+            }
+        };
+    </script>
+</body>
+</html>
